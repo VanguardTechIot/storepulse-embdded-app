@@ -10,7 +10,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 
 | Node | Folder | Sensors | Measurements |
 |---|---|---|---|
-| Smoke node | `src/smoke-node` | MQ-2 smoke sensor, optional DHT22 | `SMOKE` (ppm), `TEMPERATURE` (°C) |
+| Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
 
 ## Hardware and wiring
 
@@ -22,14 +22,15 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 | MQ-2 `GND` | `GND` | Common ground |
 | MQ-2 `AO` | `D34` | Through a 10 kΩ + 20 kΩ voltage divider, so the ESP32 input never exceeds 3.3 V |
 | MQ-2 `DO` | Not connected | |
-| DHT22 `DATA` | `D15` | Optional, enabled with `USE_DHT22` |
 | Alert LED | `D2` | On-board LED |
+
+In Wokwi the MQ-2 is powered from `3V3`, so its output is already within the ESP32 input range and the voltage divider is not needed.
 
 ## Software stack
 
 - C++ with the Arduino framework for the ESP32
 - PlatformIO, used from CLion or Visual Studio Code
-- ArduinoJson and DHT sensor library for ESPx
+- ArduinoJson
 - Wokwi for the device design
 
 ## Project structure

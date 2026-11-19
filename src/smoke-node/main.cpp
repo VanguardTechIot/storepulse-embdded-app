@@ -1,13 +1,8 @@
 #include <Arduino.h>
-#include <DHTesp.h>
 #include "Config.h"
 #include <EdgeGatewayClient.h>
 
-DHTesp dht;
-
 void setupSensor() {
-  if (USE_DHT22) dht.setup(PIN_DHT, DHTesp::DHT22);
-
   Serial.printf("[MQ-2] warming up for %lu s, keep it in clean air...\n", (unsigned long)MQ2_WARMUP_SECONDS);
   for (uint32_t s = MQ2_WARMUP_SECONDS; s > 0; s--) {
     if (s % 10 == 0) Serial.printf("[MQ-2] %lu s left\n", (unsigned long)s);
@@ -38,7 +33,7 @@ void applyActions(bool alarm) {
 }
 
 uint32_t lastReport = 0;
-uint32_t lastRiskDetected = 0;
+uint32_t lastSmokeDetected = 0;
 bool lastLocalAlarm = false;
 
 void setup() {
@@ -54,20 +49,11 @@ void setup() {
 void loop() {
   float smokePpm = readSmokePpm();
 
-  TempAndHumidity climate;
-  bool climateOk = false;
-  if (USE_DHT22) {
-    climate = dht.getTempAndHumidity();
-    climateOk = dht.getStatus() == DHTesp::ERROR_NONE;
-  }
-
   float smokeLimit = lastLocalAlarm ? SMOKE_CLEAR_PPM : SMOKE_ALERT_PPM;
-  float temperatureLimit = lastLocalAlarm ? TEMPERATURE_CLEAR_C : TEMPERATURE_ALERT_C;
-  bool riskDetected = smokePpm > smokeLimit ||
-                      (climateOk && climate.temperature > temperatureLimit);
-  if (riskDetected) lastRiskDetected = millis();
-  bool localAlarm = riskDetected ||
-                    (lastLocalAlarm && millis() - lastRiskDetected < MIN_ALARM_DURATION_MS);
+  bool smokeDetected = smokePpm > smokeLimit;
+  if (smokeDetected) lastSmokeDetected = millis();
+  bool localAlarm = smokeDetected ||
+                    (lastLocalAlarm && millis() - lastSmokeDetected < MIN_ALARM_DURATION_MS);
 
   if (millis() - lastReport >= REPORT_INTERVAL_MS || localAlarm != lastLocalAlarm) {
     lastReport = millis();
@@ -76,7 +62,6 @@ void loop() {
     JsonDocument doc;
     edge::beginTelemetry(doc);
     edge::addMeasurement(doc, "SMOKE", smokePpm);
-    if (climateOk) edge::addMeasurement(doc, "TEMPERATURE", climate.temperature);
     edge::send(doc);
   }
 
