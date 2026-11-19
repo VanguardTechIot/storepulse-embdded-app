@@ -1,0 +1,7 @@
+.pio/
+.vscode/
+cmake-build-*/
+include/Secrets.h
+*.bin
+*.elf
+*.map
