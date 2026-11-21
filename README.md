@@ -11,6 +11,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 | Node | Folder | Sensors | Measurements |
 |---|---|---|---|
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
+| Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | Images stored on the microSD card |
 
 ## Hardware and wiring
 
@@ -26,12 +27,27 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 
 In Wokwi the MQ-2 is powered from `3V3`, so its output is already within the ESP32 input range and the voltage divider is not needed.
 
+### Common area node
+
+Physical node only: Wokwi does not simulate the ESP32-CAM.
+
+| Component | Pin | Notes |
+|---|---|---|
+| Board | ESP32-CAM (AI Thinker) | Programmed through the ESP32-CAM-MB board |
+| HC-SR501 `VCC` | `5V` | Free row of the ESP32-CAM-MB headers |
+| HC-SR501 `OUT` | `IO13` | |
+| HC-SR501 `GND` | `GND` | |
+| Camera | Built-in connector | RHYX M21-45 module (GC2145 sensor) |
+| microSD | Built-in slot | FAT32, mounted in 1-bit mode (`IO2`, `IO14`, `IO15`) |
+| Flash LED | `IO4` | Status LED of the node |
+
 ## Software stack
 
 - C++ with the Arduino framework for the ESP32
 - PlatformIO, used from CLion or Visual Studio Code
 - ArduinoJson
 - Wokwi for the device design
+- Modest IoT Nano Framework on Arduino-ESP32 3.x (pioarduino platform) for the common area node
 
 ## Project structure
 
@@ -42,9 +58,14 @@ storepulse-embdded-app/
 │   ├── EdgeGatewayClient.h
 │   └── Secrets.h
 ├── src/
-│   └── smoke-node/
+│   ├── smoke-node/
+│   │   ├── main.cpp
+│   │   └── Config.h
+│   └── common-area-node/
 │       ├── main.cpp
-│       └── Config.h
+│       ├── Config.h
+│       ├── CameraDriver.h / .cpp
+│       └── ExternalStorageDriver.h / .cpp
 └── wokwi/
     └── smoke-node/
         ├── diagram.json
@@ -102,6 +123,13 @@ pio device monitor
 
 The serial monitor runs at 115200 baud.
 
+For the common area node, use the `common-area-node` environment:
+
+```bash
+pio run -e common-area-node
+pio run -e common-area-node -t upload
+```
+
 ## Running in Wokwi
 
 1. Build the `smoke-node` environment.
@@ -118,3 +146,11 @@ The Wokwi private gateway maps `host.wokwi.internal` to the computer that runs t
 - Once on, it stays on until the reading drops below 270 ppm and at least 30 seconds have passed since the last reading above the limit.
 - The alert LED turns on with the local alarm or when the Edge API answers `ALERT`.
 - If the Edge API does not answer, the node keeps up to 20 packets and sends them in order once it is reachable again, reporting how many are pending in `bufferedEvents`.
+
+### Common area node behavior
+
+- The PIR sensor works by interrupt; the node turns on the flash while motion is present.
+- On every motion event the node captures a 480x320 image, converts it to JPEG and stores it on the microSD card as `capture_NNNN.jpg`, continuing after the last stored number.
+- The microSD card is mounted on the first motion event, because the PIR output shares `IO13` with the card and keeps it low while idle.
+- Remove the microSD card before uploading the firmware: `IO2` is a boot pin and the card keeps it high. If the upload does not start, hold `IO0`, press `RST` and release `IO0`.
+- `CameraDriver` is adapted from the course ESP32-CAM example for the GC2145 sensor, and `ExternalStorageDriver` is reused from the same example.
