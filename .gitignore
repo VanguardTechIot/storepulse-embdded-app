@@ -5,3 +5,4 @@ include/Secrets.h
 *.bin
 *.elf
 *.map
+/.idea/vcs.xml
