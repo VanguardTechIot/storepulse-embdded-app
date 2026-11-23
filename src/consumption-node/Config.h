@@ -12,6 +12,7 @@ const int STATUS_LED_BLUE_PIN = 32;
 const bool STATUS_LED_COMMON_ANODE = false;
 
 /** @name Reporting Rules (README, consumption node behavior) */
+const unsigned long WATER_USE_END_TIMEOUT_IN_MILLISECONDS = 3000;
 const unsigned long WATER_CONTINUOUS_FLOW_REPORT_INTERVAL_IN_MILLISECONDS = 5UL * 60UL * 1000UL;
 const double ELECTRICITY_REPORT_THRESHOLD_IN_KILOWATT_HOURS = 0.01;
 const unsigned long HEARTBEAT_INTERVAL_IN_MILLISECONDS = 10UL * 60UL * 1000UL;
