@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "author": "VanguardTech",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "chip-yf-s201", "id": "flow", "top": -20, "left": -220, "attrs": { "flowRate": "0" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": 60, "left": -130, "rotate": 0, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 100, "left": -130, "rotate": 0, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": 140, "left": -130, "rotate": 0, "attrs": { "value": "220" } },
+    { "type": "wokwi-rgb-led", "id": "led", "top": 70, "left": -240, "attrs": { "common": "cathode" } }
+  ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "flow:VCC", "esp:3V3", "red", [] ],
+    [ "flow:GND", "esp:GND.1", "black", [] ],
+    [ "flow:OUT", "esp:D35", "yellow", [] ],
+    [ "esp:D25", "r1:2", "red", [] ],
+    [ "r1:1", "led:R", "red", [] ],
+    [ "esp:D33", "r2:2", "green", [] ],
+    [ "r2:1", "led:G", "green", [] ],
+    [ "esp:D32", "r3:2", "blue", [] ],
+    [ "r3:1", "led:B", "blue", [] ],
+    [ "led:COM", "esp:GND.2", "black", [] ]
+  ],
+  "dependencies": {}
+}
