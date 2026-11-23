@@ -12,7 +12,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 |---|---|---|---|
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
 | Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | Images stored on the microSD card |
-| Consumption node (in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
+| Consumption node (water done, electricity in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
 
 ## Hardware and wiring
 
@@ -76,9 +76,14 @@ storepulse-embdded-app/
 │       ├── ConsumptionTelemetryPackage.h / .cpp
 │       └── EdgeApiGatewayClient.h / .cpp
 └── wokwi/
-    └── smoke-node/
+    ├── smoke-node/
+    │   ├── diagram.json
+    │   └── wokwi.toml
+    └── consumption-node/
         ├── diagram.json
-        └── wokwi.toml
+        ├── wokwi.toml
+        ├── wokwi-api.h
+        └── yf-s201.chip.c / .json / .wasm
 ```
 
 - `include/EdgeGatewayClient.h`: WiFi connection, node authentication, telemetry delivery and an offline buffer of 20 packets.
@@ -156,6 +161,24 @@ pio run -e consumption-node -t upload
 
 The Wokwi private gateway maps `host.wokwi.internal` to the computer that runs the Edge API.
 
+### Consumption node
+
+The consumption node is simulated only. Wokwi does not include the YF-S201, so `wokwi/consumption-node` has a custom chip (`chip-yf-s201`) that outputs 7.5 pulses per second for each L/min.
+
+1. Build the `consumption-node` environment.
+2. Open `wokwi/consumption-node/diagram.json` with the Wokwi plugin and start the simulator. If the plugin reports "Configuration file not found in project", pick `wokwi.toml` and `diagram.json` of that folder with the folder icon of the Wokwi panel.
+3. Click the YF-S201 chip and move the **Flow rate (L/min)** control. The serial monitor shows the flow, and when the control goes back to 0 the node reports the water of that use.
+
+For example, 10 L/min for 60 seconds reports `WATER` ≈ 0.010 m³.
+
+The compiled chip (`yf-s201.chip.wasm`) is versioned, so it only has to be compiled again after changing `yf-s201.chip.c`. That needs [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) installed in `C:\wasi-sdk`:
+
+```powershell
+& "C:\wasi-sdk\bin\clang.exe" --target=wasm32-wasip1 --sysroot "C:\wasi-sdk\share\wasi-sysroot" -nostartfiles -O2 `
+  "-Wl,--import-memory" "-Wl,--export-table" "-Wl,--no-entry" `
+  -o wokwi\consumption-node\yf-s201.chip.wasm wokwi\consumption-node\yf-s201.chip.c
+```
+
 ## Behavior
 
 - The MQ-2 warms up for 60 seconds before the first reading.
@@ -184,7 +207,7 @@ Design guidelines of the node, in development. The water part and the electricit
 - Every report carries the pending consumption of both meters, whichever meter asked for it.
 - If the Edge API cannot be reached, the consumption of the report is added to the next one and retried every 30 seconds. The framework `TelemetryBuffer` is not used: in v1.1.2 it never returns the stored packets.
 - The RGB LED is green when the node works, orange when the WiFi or the Edge API cannot be reached, and purple when a meter does not answer.
-- Water: the YF-S201 is read every second (about 450 pulses per liter). The node reports when a use ends (the flow stops) and, while the water keeps running, every 5 minutes so that a leak is detected in time.
+- Water: the YF-S201 is read every second (about 450 pulses per liter) and its pulses are counted by interrupt. A use ends after 3 seconds without pulses, and then the node reports. While the water keeps running, it reports every 5 minutes so that a leak is detected in time.
 - Electricity: the node reports when the accumulated energy reaches 10 Wh (0.01 kWh).
 - Heartbeat: if the node has not reported for 10 minutes, it sends both measurements with value 0. The REST API marks a device as disconnected after 15 minutes without reports.
 - Wokwi does not include the YF-S201 or the PZEM-004T, so the simulation uses custom chips (`chip-yf-s201`) with a control to change the reading, as the course BH1750 example does.
