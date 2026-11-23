@@ -173,7 +173,8 @@ public:
         : Device(SAMPLING_INTERVAL_IN_MILLISECONDS, HARDWARE_TIMER_INDEX),
           wifiDriver(wifiDriver),
           edgeGateway(edgeGateway),
-          waterSensor(WATER_FLOW_SENSOR_PIN, this),
+          waterSensor(WATER_FLOW_SENSOR_PIN, WATER_USE_END_TIMEOUT_IN_MILLISECONDS,
+                      WATER_CONTINUOUS_FLOW_REPORT_INTERVAL_IN_MILLISECONDS, this),
           electricitySensor(ELECTRICITY_METER_RX_PIN, ELECTRICITY_METER_TX_PIN, this),
           statusLed(STATUS_LED_RED_PIN, STATUS_LED_GREEN_PIN, STATUS_LED_BLUE_PIN, STATUS_LED_COMMON_ANODE, this),
           undeliveredConsumption(DEVICE_ID, 0)
