@@ -1,0 +1,20 @@
+{
+  "name": "YF-S201",
+  "author": "VanguardTech",
+  "pins": [
+    "VCC",
+    "OUT",
+    "GND",
+    ""
+  ],
+  "controls": [
+    {
+      "id": "flowRate",
+      "label": "Flow rate (L/min)",
+      "type": "range",
+      "min": 0,
+      "max": 30,
+      "step": 0.5
+    }
+  ]
+}

@@ -12,6 +12,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 |---|---|---|---|
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
 | Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | Images stored on the microSD card |
+| Consumption node (water done, electricity in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
 
 ## Hardware and wiring
 
@@ -47,7 +48,7 @@ Physical node only: Wokwi does not simulate the ESP32-CAM.
 - PlatformIO, used from CLion or Visual Studio Code
 - ArduinoJson
 - Wokwi for the device design
-- Modest IoT Nano Framework on Arduino-ESP32 3.x (pioarduino platform) for the common area node
+- Modest IoT Nano Framework on Arduino-ESP32 3.x (pioarduino platform) for the common area node and the consumption node
 
 ## Project structure
 
@@ -61,20 +62,35 @@ storepulse-embdded-app/
 │   ├── smoke-node/
 │   │   ├── main.cpp
 │   │   └── Config.h
-│   └── common-area-node/
+│   ├── common-area-node/
+│   │   ├── main.cpp
+│   │   ├── Config.h
+│   │   ├── CameraDriver.h / .cpp
+│   │   └── ExternalStorageDriver.h / .cpp
+│   └── consumption-node/
 │       ├── main.cpp
 │       ├── Config.h
-│       ├── CameraDriver.h / .cpp
-│       └── ExternalStorageDriver.h / .cpp
+│       ├── ConsumptionSensor.h / .cpp
+│       ├── WaterConsumptionSensor.h / .cpp
+│       ├── ElectricityConsumptionSensor.h / .cpp
+│       ├── ConsumptionTelemetryPackage.h / .cpp
+│       └── EdgeApiGatewayClient.h / .cpp
 └── wokwi/
-    └── smoke-node/
+    ├── smoke-node/
+    │   ├── diagram.json
+    │   └── wokwi.toml
+    └── consumption-node/
         ├── diagram.json
-        └── wokwi.toml
+        ├── wokwi.toml
+        ├── wokwi-api.h
+        └── yf-s201.chip.c / .json / .wasm
 ```
 
 - `include/EdgeGatewayClient.h`: WiFi connection, node authentication, telemetry delivery and an offline buffer of 20 packets.
 - `src/<node>/Config.h`: pins, thresholds and intervals of each node.
 - `include/Secrets.h`: network and node credentials. It is not versioned.
+- `src/consumption-node/ConsumptionSensor.h`: base class of the water and electricity meters. Each meter accumulates its consumption and asks the node for a report.
+- `src/consumption-node/EdgeApiGatewayClient.h`: gateway client of the consumption node for the Edge API. It sends the `X-API-Key` header, which the framework `HttpGatewayClient` does not support.
 
 ## Configuration
 
@@ -130,6 +146,13 @@ pio run -e common-area-node
 pio run -e common-area-node -t upload
 ```
 
+For the consumption node, use the `consumption-node` environment and register the node in the Edge API with `"device_type":"CONSUMPTION_NODE"`:
+
+```bash
+pio run -e consumption-node
+pio run -e consumption-node -t upload
+```
+
 ## Running in Wokwi
 
 1. Build the `smoke-node` environment.
@@ -137,6 +160,24 @@ pio run -e common-area-node -t upload
 3. Change the gas concentration of the MQ-2 to raise the smoke reading.
 
 The Wokwi private gateway maps `host.wokwi.internal` to the computer that runs the Edge API.
+
+### Consumption node
+
+The consumption node is simulated only. Wokwi does not include the YF-S201, so `wokwi/consumption-node` has a custom chip (`chip-yf-s201`) that outputs 7.5 pulses per second for each L/min.
+
+1. Build the `consumption-node` environment.
+2. Open `wokwi/consumption-node/diagram.json` with the Wokwi plugin and start the simulator. If the plugin reports "Configuration file not found in project", pick `wokwi.toml` and `diagram.json` of that folder with the folder icon of the Wokwi panel.
+3. Click the YF-S201 chip and move the **Flow rate (L/min)** control. The serial monitor shows the flow, and when the control goes back to 0 the node reports the water of that use.
+
+For example, 10 L/min for 60 seconds reports `WATER` ≈ 0.010 m³.
+
+The compiled chip (`yf-s201.chip.wasm`) is versioned, so it only has to be compiled again after changing `yf-s201.chip.c`. That needs [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) installed in `C:\wasi-sdk`:
+
+```powershell
+& "C:\wasi-sdk\bin\clang.exe" --target=wasm32-wasip1 --sysroot "C:\wasi-sdk\share\wasi-sysroot" -nostartfiles -O2 `
+  "-Wl,--import-memory" "-Wl,--export-table" "-Wl,--no-entry" `
+  -o wokwi\consumption-node\yf-s201.chip.wasm wokwi\consumption-node\yf-s201.chip.c
+```
 
 ## Behavior
 
@@ -154,3 +195,20 @@ The Wokwi private gateway maps `host.wokwi.internal` to the computer that runs t
 - The microSD card is mounted on the first motion event, because the PIR output shares `IO13` with the card and keeps it low while idle.
 - Remove the microSD card before uploading the firmware: `IO2` is a boot pin and the card keeps it high. If the upload does not start, hold `IO0`, press `RST` and release `IO0`.
 - `CameraDriver` is adapted from the course ESP32-CAM example for the GC2145 sensor, and `ExternalStorageDriver` is reused from the same example.
+
+### Consumption node behavior
+
+Design guidelines of the node, in development. The water part and the electricity part follow the same rules.
+
+- The node is built on the Modest IoT Nano Framework and is loop-less: it only acts when a sensor event arrives. The sensors are read locally, and nothing is sent while there is no consumption.
+- Each measurement is the consumption since the previous report, never the cumulative counter of the meter: `WATER` in m³ and `ELECTRICITY` in kWh. The Edge API and the REST API add up every value they receive.
+- Values are never negative. A negative difference, for example after the PZEM-004T counter is reset, is discarded.
+- Values are not rounded to 3 decimals. Any consumption that is not sent yet is carried over to the next report, so small loads and slow leaks are not lost.
+- Every report carries the pending consumption of both meters, whichever meter asked for it.
+- If the Edge API cannot be reached, the consumption of the report is added to the next one and retried every 30 seconds. The framework `TelemetryBuffer` is not used: in v1.1.2 it never returns the stored packets.
+- The RGB LED is green when the node works, orange when the WiFi or the Edge API cannot be reached, and purple when a meter does not answer.
+- Water: the YF-S201 is read every second (about 450 pulses per liter) and its pulses are counted by interrupt. A use ends after 3 seconds without pulses, and then the node reports. While the water keeps running, it reports every 5 minutes so that a leak is detected in time.
+- Electricity: the node reports when the accumulated energy reaches 10 Wh (0.01 kWh).
+- Heartbeat: if the node has not reported for 10 minutes, it sends both measurements with value 0. The REST API marks a device as disconnected after 15 minutes without reports.
+- Wokwi does not include the YF-S201 or the PZEM-004T, so the simulation uses custom chips (`chip-yf-s201`) with a control to change the reading, as the course BH1750 example does.
+- `WaterFlowSensor` of the framework is not used: it never counts the pulses and assumes 7 pulses per milliliter. The node defines its own water sensor class.
