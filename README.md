@@ -48,7 +48,7 @@ Physical node only: Wokwi does not simulate the ESP32-CAM.
 - PlatformIO, used from CLion or Visual Studio Code
 - ArduinoJson
 - Wokwi for the device design
-- Modest IoT Nano Framework on Arduino-ESP32 3.x (pioarduino platform) for the common area node
+- Modest IoT Nano Framework on Arduino-ESP32 3.x (pioarduino platform) for the common area node and the consumption node
 
 ## Project structure
 
@@ -62,11 +62,19 @@ storepulse-embdded-app/
 │   ├── smoke-node/
 │   │   ├── main.cpp
 │   │   └── Config.h
-│   └── common-area-node/
+│   ├── common-area-node/
+│   │   ├── main.cpp
+│   │   ├── Config.h
+│   │   ├── CameraDriver.h / .cpp
+│   │   └── ExternalStorageDriver.h / .cpp
+│   └── consumption-node/
 │       ├── main.cpp
 │       ├── Config.h
-│       ├── CameraDriver.h / .cpp
-│       └── ExternalStorageDriver.h / .cpp
+│       ├── ConsumptionSensor.h / .cpp
+│       ├── WaterConsumptionSensor.h / .cpp
+│       ├── ElectricityConsumptionSensor.h / .cpp
+│       ├── ConsumptionTelemetryPackage.h / .cpp
+│       └── EdgeApiGatewayClient.h / .cpp
 └── wokwi/
     └── smoke-node/
         ├── diagram.json
@@ -76,6 +84,8 @@ storepulse-embdded-app/
 - `include/EdgeGatewayClient.h`: WiFi connection, node authentication, telemetry delivery and an offline buffer of 20 packets.
 - `src/<node>/Config.h`: pins, thresholds and intervals of each node.
 - `include/Secrets.h`: network and node credentials. It is not versioned.
+- `src/consumption-node/ConsumptionSensor.h`: base class of the water and electricity meters. Each meter accumulates its consumption and asks the node for a report.
+- `src/consumption-node/EdgeApiGatewayClient.h`: gateway client of the consumption node for the Edge API. It sends the `X-API-Key` header, which the framework `HttpGatewayClient` does not support.
 
 ## Configuration
 
@@ -131,6 +141,13 @@ pio run -e common-area-node
 pio run -e common-area-node -t upload
 ```
 
+For the consumption node, use the `consumption-node` environment and register the node in the Edge API with `"device_type":"CONSUMPTION_NODE"`:
+
+```bash
+pio run -e consumption-node
+pio run -e consumption-node -t upload
+```
+
 ## Running in Wokwi
 
 1. Build the `smoke-node` environment.
@@ -164,6 +181,9 @@ Design guidelines of the node, in development. The water part and the electricit
 - Each measurement is the consumption since the previous report, never the cumulative counter of the meter: `WATER` in m³ and `ELECTRICITY` in kWh. The Edge API and the REST API add up every value they receive.
 - Values are never negative. A negative difference, for example after the PZEM-004T counter is reset, is discarded.
 - Values are not rounded to 3 decimals. Any consumption that is not sent yet is carried over to the next report, so small loads and slow leaks are not lost.
+- Every report carries the pending consumption of both meters, whichever meter asked for it.
+- If the Edge API cannot be reached, the consumption of the report is added to the next one and retried every 30 seconds. The framework `TelemetryBuffer` is not used: in v1.1.2 it never returns the stored packets.
+- The RGB LED is green when the node works, orange when the WiFi or the Edge API cannot be reached, and purple when a meter does not answer.
 - Water: the YF-S201 is read every second (about 450 pulses per liter). The node reports when a use ends (the flow stops) and, while the water keeps running, every 5 minutes so that a leak is detected in time.
 - Electricity: the node reports when the accumulated energy reaches 10 Wh (0.01 kWh).
 - Heartbeat: if the node has not reported for 10 minutes, it sends both measurements with value 0. The REST API marks a device as disconnected after 15 minutes without reports.
