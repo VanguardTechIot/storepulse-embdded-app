@@ -12,6 +12,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 |---|---|---|---|
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
 | Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | Images stored on the microSD card |
+| Consumption node (in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
 
 ## Hardware and wiring
 
@@ -154,3 +155,17 @@ The Wokwi private gateway maps `host.wokwi.internal` to the computer that runs t
 - The microSD card is mounted on the first motion event, because the PIR output shares `IO13` with the card and keeps it low while idle.
 - Remove the microSD card before uploading the firmware: `IO2` is a boot pin and the card keeps it high. If the upload does not start, hold `IO0`, press `RST` and release `IO0`.
 - `CameraDriver` is adapted from the course ESP32-CAM example for the GC2145 sensor, and `ExternalStorageDriver` is reused from the same example.
+
+### Consumption node behavior
+
+Design guidelines of the node, in development. The water part and the electricity part follow the same rules.
+
+- The node is built on the Modest IoT Nano Framework and is loop-less: it only acts when a sensor event arrives. The sensors are read locally, and nothing is sent while there is no consumption.
+- Each measurement is the consumption since the previous report, never the cumulative counter of the meter: `WATER` in m³ and `ELECTRICITY` in kWh. The Edge API and the REST API add up every value they receive.
+- Values are never negative. A negative difference, for example after the PZEM-004T counter is reset, is discarded.
+- Values are not rounded to 3 decimals. Any consumption that is not sent yet is carried over to the next report, so small loads and slow leaks are not lost.
+- Water: the YF-S201 is read every second (about 450 pulses per liter). The node reports when a use ends (the flow stops) and, while the water keeps running, every 5 minutes so that a leak is detected in time.
+- Electricity: the node reports when the accumulated energy reaches 10 Wh (0.01 kWh).
+- Heartbeat: if the node has not reported for 10 minutes, it sends both measurements with value 0. The REST API marks a device as disconnected after 15 minutes without reports.
+- Wokwi does not include the YF-S201 or the PZEM-004T, so the simulation uses custom chips (`chip-yf-s201`) with a control to change the reading, as the course BH1750 example does.
+- `WaterFlowSensor` of the framework is not used: it never counts the pulses and assumes 7 pulses per milliliter. The node defines its own water sensor class.
