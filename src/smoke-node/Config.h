@@ -2,18 +2,31 @@
 
 #include <Arduino.h>
 
-const bool SEND_TO_EDGE = true;
-const uint32_t REPORT_INTERVAL_MS = 30000;
+const int SMOKE_SENSOR_PIN = 34;
+const int ALERT_LED_PIN = 2;
 
-const int PIN_MQ2 = 34;
-const int PIN_ALERT_LED = 2;
-const int PIN_BUZZER = -1;
-const int PIN_BATTERY = -1;
-const float BATTERY_DIVIDER_RATIO = 2.0;
+const unsigned long SENSOR_WARM_UP_DURATION_IN_MILLISECONDS = 60000;
+const float SMOKE_PPM_PER_ADC_COUNT = 1000.0f / 4095.0f;
+const float SMOKE_ALERT_THRESHOLD_IN_PPM = 300.0f;
+const float SMOKE_CLEAR_THRESHOLD_IN_PPM = 270.0f;
+const unsigned long MINIMUM_ALARM_DURATION_IN_MILLISECONDS = 30000;
 
-const uint32_t MQ2_WARMUP_SECONDS = 60;
-const float MQ2_PPM_PER_COUNT = 1000.0 / 4095.0;
+const unsigned long REPORT_INTERVAL_IN_MILLISECONDS = 30000;
+const unsigned long STATUS_CHECK_INTERVAL_IN_MILLISECONDS = 1000;
+const unsigned long WARM_UP_LOG_INTERVAL_IN_MILLISECONDS = 10000;
+const unsigned long REPORT_RETRY_INTERVAL_IN_MILLISECONDS = 30000;
+const size_t MAXIMUM_UNDELIVERED_REPORTS = 20;
 
-const float SMOKE_ALERT_PPM = 300.0;
-const float SMOKE_CLEAR_PPM = 270.0;
-const uint32_t MIN_ALARM_DURATION_MS = 30000;
+const unsigned long WIFI_CONNECTION_TIMEOUT_IN_MILLISECONDS = 15000;
+const uint16_t EDGE_REQUEST_TIMEOUT_IN_MILLISECONDS = 5000;
+const char* const TIME_ZONE = "UTC0";
+const char* const NTP_SERVER = "pool.ntp.org";
+
+const char* const FIRMWARE_VERSION = "SP-SMK FW 0.2.0";
+const unsigned long SAMPLING_INTERVAL_IN_MILLISECONDS = 1000;
+const uint8_t HARDWARE_TIMER_INDEX = 0;
+const uint32_t SAMPLER_STACK_BYTES = 8192;
+const uint32_t NETWORK_STACK_BYTES = 12288;
+const uint8_t ASYNC_ENGINE_QUEUE_DEPTH = 8;
+const unsigned long SERIAL_BAUD_RATE = 115200;
+const unsigned long MAIN_LOOP_DELAY_IN_MILLISECONDS = 1000;
