@@ -3,21 +3,86 @@
   "author": "VanguardTech",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
     {
       "type": "wokwi-pir-motion-sensor",
       "id": "pir",
       "top": -120,
       "left": -220,
-      "attrs": { "delayTime": "5", "inhibitTime": "1.2" }
+      "attrs": {
+        "delayTime": "5",
+        "inhibitTime": "1.2"
+      }
+    },
+    {
+      "type": "wokwi-ds1307",
+      "id": "rtc",
+      "top": -130,
+      "left": 180,
+      "attrs": {}
     }
   ],
   "connections": [
-    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
-    [ "pir:VCC", "esp:VIN", "red", [] ],
-    [ "pir:GND", "esp:GND.2", "black", [] ],
-    [ "pir:OUT", "esp:D27", "green", [] ]
+    [
+      "esp:TX0",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX0",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "pir:VCC",
+      "esp:VIN",
+      "red",
+      []
+    ],
+    [
+      "pir:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "pir:OUT",
+      "esp:D27",
+      "green",
+      []
+    ],
+    [
+      "rtc:5V",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "rtc:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "rtc:SDA",
+      "esp:D21",
+      "blue",
+      []
+    ],
+    [
+      "rtc:SCL",
+      "esp:D22",
+      "purple",
+      []
+    ]
   ],
   "dependencies": {}
 }
