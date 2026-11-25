@@ -14,7 +14,11 @@ const int STATUS_LED_BLUE_PIN = 32;
 const bool STATUS_LED_COMMON_ANODE = false;
 
 /** @name Motion Detection (section 5.6, algorithms 2 and 4 of step 10) */
+#ifdef WOKWI_SIMULATION
+const unsigned long PIR_WARM_UP_IN_MILLISECONDS = 5000;   // The simulated PIR is stable at once
+#else
 const unsigned long PIR_WARM_UP_IN_MILLISECONDS = 60000;
+#endif
 const unsigned long MOTION_SAMPLING_INTERVAL_IN_MILLISECONDS = 100;   // 10 Hz
 const uint8_t MOTION_CONFIRMATION_READINGS = 3;
 const unsigned long MOTION_ENDED_AFTER_IN_MILLISECONDS = 5000;
@@ -22,8 +26,14 @@ const unsigned long ALARM_DURATION_IN_MILLISECONDS = 60000;
 
 /** @name Attention Hours (same window as BusinessHours in the Edge API) */
 const long ATTENTION_UTC_OFFSET_IN_SECONDS = -5L * 3600L;   // Lima, no daylight saving time
+#ifdef WOKWI_SIMULATION
+// The simulated gallery is always closed, so the intrusion flow can be tested at any hour
+const int ATTENTION_OPENING_HOUR = 0;
+const int ATTENTION_CLOSING_HOUR = 0;
+#else
 const int ATTENTION_OPENING_HOUR = 10;
 const int ATTENTION_CLOSING_HOUR = 22;
+#endif
 
 /** @name Real-Time Clock and Indicators */
 const unsigned long RTC_SYNC_INTERVAL_IN_MILLISECONDS = 3600000UL;

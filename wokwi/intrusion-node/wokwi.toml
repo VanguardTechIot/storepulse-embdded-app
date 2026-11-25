@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = "../../.pio/build/intrusion-node-wokwi/firmware.factory.bin"
+elf = "../../.pio/build/intrusion-node-wokwi/firmware.elf"

@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "author": "VanguardTech",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pir-motion-sensor",
+      "id": "pir",
+      "top": -120,
+      "left": -220,
+      "attrs": {
+        "delayTime": "5",
+        "inhibitTime": "1.2"
+      }
+    },
+    {
+      "type": "wokwi-ds1307",
+      "id": "rtc",
+      "top": -130,
+      "left": 180,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": 160,
+      "left": -200,
+      "attrs": {
+        "volume": "0.2"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r4",
+      "top": 250,
+      "left": -120,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "alarmLed",
+      "top": 200,
+      "left": -40,
+      "attrs": {
+        "color": "red",
+        "label": "ALARM"
+      }
+    },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb",
+      "top": 150,
+      "left": 260,
+      "attrs": {
+        "common": "cathode"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 110,
+      "left": 170,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 140,
+      "left": 170,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": 170,
+      "left": 170,
+      "attrs": {
+        "value": "220"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX0",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX0",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "pir:VCC",
+      "esp:VIN",
+      "red",
+      []
+    ],
+    [
+      "pir:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "pir:OUT",
+      "esp:D27",
+      "green",
+      []
+    ],
+    [
+      "rtc:5V",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "rtc:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "rtc:SDA",
+      "esp:D21",
+      "blue",
+      []
+    ],
+    [
+      "rtc:SCL",
+      "esp:D22",
+      "purple",
+      []
+    ],
+    [
+      "bz:1",
+      "esp:D26",
+      "orange",
+      []
+    ],
+    [
+      "bz:2",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "esp:D26",
+      "r4:1",
+      "orange",
+      []
+    ],
+    [
+      "r4:2",
+      "alarmLed:A",
+      "orange",
+      []
+    ],
+    [
+      "alarmLed:C",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "esp:D25",
+      "r1:1",
+      "red",
+      []
+    ],
+    [
+      "r1:2",
+      "rgb:R",
+      "red",
+      []
+    ],
+    [
+      "esp:D33",
+      "r2:1",
+      "green",
+      []
+    ],
+    [
+      "r2:2",
+      "rgb:G",
+      "green",
+      []
+    ],
+    [
+      "esp:D32",
+      "r3:1",
+      "blue",
+      []
+    ],
+    [
+      "r3:2",
+      "rgb:B",
+      "blue",
+      []
+    ],
+    [
+      "rgb:COM",
+      "esp:GND.1",
+      "black",
+      []
+    ]
+  ],
+  "dependencies": {}
+}
