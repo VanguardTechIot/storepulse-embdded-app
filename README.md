@@ -11,6 +11,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 | Node | Folder | Sensors | Measurements |
 |---|---|---|---|
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
+| Intrusion node | `src/intrusion-node` | HC-SR501 PIR sensor, DS3231 clock, active buzzer, RGB LED | `MOTION` (1 per intrusion outside attention hours) |
 | Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | Images stored on the microSD card |
 | Consumption node (water done, electricity in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
 
