@@ -14,7 +14,11 @@ const int STATUS_LED_BLUE_PIN = 32;
 const bool STATUS_LED_COMMON_ANODE = false;
 
 /** @name Motion Detection (section 5.6, algorithms 2 and 4 of step 10) */
+#ifdef WOKWI_SIMULATION
+const unsigned long PIR_WARM_UP_IN_MILLISECONDS = 5000;   // The simulated PIR is stable at once
+#else
 const unsigned long PIR_WARM_UP_IN_MILLISECONDS = 60000;
+#endif
 const unsigned long MOTION_SAMPLING_INTERVAL_IN_MILLISECONDS = 100;   // 10 Hz
 const uint8_t MOTION_CONFIRMATION_READINGS = 3;
 const unsigned long MOTION_ENDED_AFTER_IN_MILLISECONDS = 5000;
