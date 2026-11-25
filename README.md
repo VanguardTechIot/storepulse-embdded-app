@@ -197,6 +197,23 @@ pio run -e intrusion-node -t upload
 
 The Wokwi private gateway maps `host.wokwi.internal` to the computer that runs the Edge API.
 
+### Intrusion node
+
+The simulation uses its own environment, `intrusion-node-wokwi`, which builds the same firmware with the `WOKWI_SIMULATION` flag:
+
+- The PIR warm-up is 5 seconds instead of 60, since the simulated PIR is stable at once.
+- The gallery is always closed, so an intrusion can be tested at any hour. The physical node keeps attention hours from 10:00 to 22:00.
+
+Wokwi does not include the DS3231, so the diagram uses its DS1307. Both sit at I2C address `0x68` with the same time registers, so `RTClib` reads it the same way. The buzzer has a red **ALARM** LED in parallel, because Wokwi does not play a buzzer driven with a constant level.
+
+1. Build the `intrusion-node-wokwi` environment: `pio run -e intrusion-node-wokwi`.
+2. Open `wokwi/intrusion-node/diagram.json` with the Wokwi plugin and start the simulator. If the plugin reports "Configuration file not found in project", pick `wokwi.toml` and `diagram.json` of that folder with the folder icon of the Wokwi panel.
+3. Wait for `[IntrusionNode] Ready` and 5 seconds of warm-up.
+4. Click the PIR sensor and press **Simulate motion**. The ALARM LED turns on for 60 seconds, the RGB LED blinks red, and the serial monitor shows the `MOTION` report sent to the Edge API.
+5. Press it again before the movement has stopped for 5 seconds: the alarm restarts, but no second report is sent.
+
+Without the Edge API running, the report is kept and retried every 30 seconds, and the RGB LED blinks amber after the alarm ends.
+
 ### Consumption node
 
 The consumption node is simulated only. Wokwi does not include the YF-S201, so `wokwi/consumption-node` has a custom chip (`chip-yf-s201`) that outputs 7.5 pulses per second for each L/min.
