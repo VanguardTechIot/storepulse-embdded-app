@@ -28,6 +28,16 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 
 In Wokwi the MQ-2 is powered from `3V3`, so its output is already within the ESP32 input range and the voltage divider is not needed.
 
+### Intrusion node
+
+| Component | Pin | Notes |
+|---|---|---|
+| HC-SR501 `VCC` / `GND` | `5V` / `GND` | |
+| HC-SR501 `OUT` | `GPIO 27` | Movement is confirmed after 3 consecutive readings at 10 Hz |
+| Active buzzer `+` | `GPIO 26` | Driven through an NPN transistor in the physical build, since a GPIO cannot supply its current |
+| DS3231 `SDA` / `SCL` | `GPIO 21` / `GPIO 22` | I2C, powered from `3V3`. Keeps UTC time without network |
+| RGB LED `R` / `G` / `B` | `GPIO 25` / `GPIO 33` / `GPIO 32` | 220 Ω resistor per channel |
+
 ### Common area node
 
 Physical node only: Wokwi does not simulate the ESP32-CAM.
@@ -62,6 +72,16 @@ storepulse-embdded-app/
 │   ├── smoke-node/
 │   │   ├── main.cpp
 │   │   └── Config.h
+│   ├── intrusion-node/
+│   │   ├── main.cpp
+│   │   ├── Config.h
+│   │   ├── AttentionHours.h / .cpp
+│   │   ├── IntrusionSensor.h / .cpp
+│   │   ├── RealTimeClockDriver.h / .cpp
+│   │   ├── AlarmBuzzer.h / .cpp
+│   │   ├── StatusLedDriver.h / .cpp
+│   │   ├── IntrusionTelemetryPackage.h / .cpp
+│   │   └── EdgeApiGatewayClient.h / .cpp
 │   ├── common-area-node/
 │   │   ├── main.cpp
 │   │   ├── Config.h
@@ -91,6 +111,9 @@ storepulse-embdded-app/
 - `include/Secrets.h`: network and node credentials. It is not versioned.
 - `src/consumption-node/ConsumptionSensor.h`: base class of the water and electricity meters. Each meter accumulates its consumption and asks the node for a report.
 - `src/consumption-node/EdgeApiGatewayClient.h`: gateway client of the consumption node for the Edge API. It sends the `X-API-Key` header, which the framework `HttpGatewayClient` does not support.
+- `src/intrusion-node/AttentionHours.h`: decides whether an instant is outside attention hours, in Lima time.
+- `src/intrusion-node/IntrusionSensor.h`: PIR sensor that confirms an intrusion after consecutive readings.
+- `src/intrusion-node/RealTimeClockDriver.h`: DS3231 clock that keeps UTC time without network.
 
 ## Configuration
 
@@ -127,6 +150,8 @@ curl -X POST http://127.0.0.1:5000/api/v1/iam/devices \
 
 Copy the returned `api_key` to `API_KEY` in `include/Secrets.h`. It is only shown once.
 
+For the intrusion node, use `"device_type":"INTRUSION_NODE"`.
+
 ## Build and upload
 
 From CLion or Visual Studio Code with the PlatformIO plugin, select the `smoke-node` environment and use Build, Upload and Monitor. From a terminal:
@@ -151,6 +176,13 @@ For the consumption node, use the `consumption-node` environment and register th
 ```bash
 pio run -e consumption-node
 pio run -e consumption-node -t upload
+```
+
+For the intrusion node, use the `intrusion-node` environment and register the node in the Edge API with `"device_type":"INTRUSION_NODE"`:
+
+```bash
+pio run -e intrusion-node
+pio run -e intrusion-node -t upload
 ```
 
 ## Running in Wokwi
@@ -195,6 +227,16 @@ The compiled chip (`yf-s201.chip.wasm`) is versioned, so it only has to be compi
 - The microSD card is mounted on the first motion event, because the PIR output shares `IO13` with the card and keeps it low while idle.
 - Remove the microSD card before uploading the firmware: `IO2` is a boot pin and the card keeps it high. If the upload does not start, hold `IO0`, press `RST` and release `IO0`.
 - `CameraDriver` is adapted from the course ESP32-CAM example for the GC2145 sensor, and `ExternalStorageDriver` is reused from the same example.
+
+### Intrusion node behavior
+
+- Movement is confirmed after 3 consecutive PIR readings at 10 Hz. A single reading does not trigger the alarm.
+- Attention hours are 10:00 to 22:00 in Lima time (UTC-5). They match the window the Edge API uses for `MOTION`, so both sides agree.
+- Outside attention hours, a confirmed intrusion sounds the local alarm at once, for 60 seconds, and sends one `MOTION` measurement with value `1`. Inside attention hours, nothing is sent.
+- Only one event is sent per intrusion. A new event requires that the movement stops for at least 5 seconds.
+- The DS3231 keeps UTC time without network and sets the system clock at boot. NTP corrects it when the network is up.
+- If the clock has no valid time, the node does not sound the alarm and shows purple, because an incorrect clock could sound it during attention hours.
+- LED states, by priority: red blinking (intrusion), purple (error), amber blinking (no network), blue (backup power), green (normal).
 
 ### Consumption node behavior
 
