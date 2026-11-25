@@ -210,7 +210,7 @@ Wokwi does not include the DS3231, so the diagram uses its DS1307. Both sit at I
 2. Open `wokwi/intrusion-node/diagram.json` with the Wokwi plugin and start the simulator. If the plugin reports "Configuration file not found in project", pick `wokwi.toml` and `diagram.json` of that folder with the folder icon of the Wokwi panel.
 3. Wait for `[IntrusionNode] Ready` and 5 seconds of warm-up.
 4. Click the PIR sensor and press **Simulate motion**. The ALARM LED turns on for 60 seconds, the RGB LED blinks red, and the serial monitor shows the `MOTION` report sent to the Edge API.
-5. Press it again before the movement has stopped for 5 seconds: the alarm restarts, but no second report is sent.
+5. Each press keeps the PIR output high for 5 seconds. A new report is sent only after the output has stayed low for 5 seconds (`[IntrusionNode] Movement stopped`).
 
 Without the Edge API running, the report is kept and retried every 30 seconds, and the RGB LED blinks amber after the alarm ends.
 
