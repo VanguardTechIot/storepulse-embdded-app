@@ -26,6 +26,15 @@
       "top": -130,
       "left": 180,
       "attrs": {}
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": 160,
+      "left": -200,
+      "attrs": {
+        "volume": "0.2"
+      }
     }
   ],
   "connections": [
@@ -81,6 +90,18 @@
       "rtc:SCL",
       "esp:D22",
       "purple",
+      []
+    ],
+    [
+      "bz:1",
+      "esp:D26",
+      "orange",
+      []
+    ],
+    [
+      "bz:2",
+      "esp:GND.2",
+      "black",
       []
     ]
   ],
