@@ -100,6 +100,9 @@ storepulse-embdded-app/
     ├── smoke-node/
     │   ├── diagram.json
     │   └── wokwi.toml
+    ├── intrusion-node/
+    │   ├── diagram.json
+    │   └── wokwi.toml
     └── consumption-node/
         ├── diagram.json
         ├── wokwi.toml
