@@ -54,6 +54,42 @@
         "color": "red",
         "label": "ALARM"
       }
+    },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb",
+      "top": 150,
+      "left": 260,
+      "attrs": {
+        "common": "cathode"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 110,
+      "left": 170,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 140,
+      "left": 170,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": 170,
+      "left": 170,
+      "attrs": {
+        "value": "220"
+      }
     }
   ],
   "connections": [
@@ -138,6 +174,48 @@
     [
       "alarmLed:C",
       "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "esp:D25",
+      "r1:1",
+      "red",
+      []
+    ],
+    [
+      "r1:2",
+      "rgb:R",
+      "red",
+      []
+    ],
+    [
+      "esp:D33",
+      "r2:1",
+      "green",
+      []
+    ],
+    [
+      "r2:2",
+      "rgb:G",
+      "green",
+      []
+    ],
+    [
+      "esp:D32",
+      "r3:1",
+      "blue",
+      []
+    ],
+    [
+      "r3:2",
+      "rgb:B",
+      "blue",
+      []
+    ],
+    [
+      "rgb:COM",
+      "esp:GND.1",
       "black",
       []
     ]
