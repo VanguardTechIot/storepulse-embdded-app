@@ -26,8 +26,14 @@ const unsigned long ALARM_DURATION_IN_MILLISECONDS = 60000;
 
 /** @name Attention Hours (same window as BusinessHours in the Edge API) */
 const long ATTENTION_UTC_OFFSET_IN_SECONDS = -5L * 3600L;   // Lima, no daylight saving time
+#ifdef WOKWI_SIMULATION
+// The simulated gallery is always closed, so the intrusion flow can be tested at any hour
+const int ATTENTION_OPENING_HOUR = 0;
+const int ATTENTION_CLOSING_HOUR = 0;
+#else
 const int ATTENTION_OPENING_HOUR = 10;
 const int ATTENTION_CLOSING_HOUR = 22;
+#endif
 
 /** @name Real-Time Clock and Indicators */
 const unsigned long RTC_SYNC_INTERVAL_IN_MILLISECONDS = 3600000UL;
