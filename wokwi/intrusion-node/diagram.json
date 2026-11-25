@@ -35,6 +35,25 @@
       "attrs": {
         "volume": "0.2"
       }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r4",
+      "top": 250,
+      "left": -120,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "alarmLed",
+      "top": 200,
+      "left": -40,
+      "attrs": {
+        "color": "red",
+        "label": "ALARM"
+      }
     }
   ],
   "connections": [
@@ -100,6 +119,24 @@
     ],
     [
       "bz:2",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "esp:D26",
+      "r4:1",
+      "orange",
+      []
+    ],
+    [
+      "r4:2",
+      "alarmLed:A",
+      "orange",
+      []
+    ],
+    [
+      "alarmLed:C",
       "esp:GND.2",
       "black",
       []
