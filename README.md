@@ -12,7 +12,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 |---|---|---|---|
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
 | Intrusion node | `src/intrusion-node` | HC-SR501 PIR sensor, DS3231 clock, active buzzer, RGB LED | `MOTION` (1 per intrusion outside attention hours) |
-| Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | Images stored on the microSD card |
+| Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | `MOTION` (1 when motion starts, 0 when it stops); images stored on the microSD card|
 | Consumption node (water done, electricity in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
 
 ## Hardware and wiring
@@ -168,7 +168,7 @@ pio device monitor
 
 The serial monitor runs at 115200 baud.
 
-For the common area node, use the `common-area-node` environment:
+For the common area node, use the `common-area-node` environment and register the node in the Edge API with `"device_type":"COMMON_AREA_NODE"`:
 
 ```bash
 pio run -e common-area-node
@@ -248,6 +248,9 @@ The compiled chip (`yf-s201.chip.wasm`) is versioned, so it only has to be compi
 - The microSD card is mounted on the first motion event, because the PIR output shares `IO13` with the card and keeps it low while idle.
 - Remove the microSD card before uploading the firmware: `IO2` is a boot pin and the card keeps it high. If the upload does not start, hold `IO0`, press `RST` and release `IO0`.
 - `CameraDriver` is adapted from the course ESP32-CAM example for the GC2145 sensor, and `ExternalStorageDriver` is reused from the same example.
+- Sends a `MOTION` measurement with value `1` when motion starts and `0` when it stops; the Edge API raises an alert only outside attention hours.
+- Reports `0` at boot and repeats the current state every 10 minutes without motion, so the backend keeps the node connected.
+- Keeps up to 20 reports when the Edge API is unreachable and retries them every 30 seconds.
 
 ### Intrusion node behavior
 
