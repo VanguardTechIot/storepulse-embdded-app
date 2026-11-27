@@ -13,7 +13,7 @@ ESP32 node ── HTTP/JSON + X-API-Key ──► Edge API (Flask + SQLite) ─�
 | Smoke node | `src/smoke-node` | MQ-2 smoke sensor | `SMOKE` (ppm) |
 | Intrusion node | `src/intrusion-node` | HC-SR501 PIR sensor, DS3231 clock, active buzzer, RGB LED | `MOTION` (1 per intrusion outside attention hours) |
 | Common area node | `src/common-area-node` | HC-SR501 PIR sensor, camera, microSD | `MOTION` (1 when motion starts, 0 when it stops); images stored on the microSD card|
-| Consumption node (water done, electricity in development) | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
+| Consumption node | `src/consumption-node` | YF-S201 water flow sensor, PZEM-004T energy meter | `WATER` (m³), `ELECTRICITY` (kWh) |
 
 ## Hardware and wiring
 
@@ -52,6 +52,17 @@ Physical node only: Wokwi does not simulate the ESP32-CAM.
 | Camera | Built-in connector | RHYX M21-45 module (GC2145 sensor) |
 | microSD | Built-in slot | FAT32, mounted in 1-bit mode (`IO2`, `IO14`, `IO15`) |
 | Flash LED | `IO4` | Status LED of the node |
+
+### Consumption node
+
+Simulated node only (Wokwi custom chips).
+
+| Component | Pin | Notes |
+|---|---|---|
+| YF-S201 `OUT` | `GPIO 35` | Pulses counted by interrupt. Input only: a physical build needs an external pull-up and a 5 V to 3.3 V divider |
+| PZEM-004T `TX` | `GPIO 16` (UART2 RX) | Modbus-RTU, 9600 8N1 |
+| PZEM-004T `RX` | `GPIO 17` (UART2 TX) | |
+| RGB LED `R` / `G` / `B` | `GPIO 25` / `GPIO 33` / `GPIO 32` | 220 Ω resistor per channel, common cathode |
 
 ## Software stack
 
@@ -107,6 +118,7 @@ storepulse-embdded-app/
         ├── diagram.json
         ├── wokwi.toml
         ├── wokwi-api.h
+        ├── pzem-004t.chip.c / .json / .wasm
         └── yf-s201.chip.c / .json / .wasm
 ```
 
@@ -216,13 +228,18 @@ Without the Edge API running, the report is kept and retried every 30 seconds, a
 
 ### Consumption node
 
-The consumption node is simulated only. Wokwi does not include the YF-S201, so `wokwi/consumption-node` has a custom chip (`chip-yf-s201`) that outputs 7.5 pulses per second for each L/min.
+The consumption node is simulated only. Wokwi does not include the YF-S201 or the PZEM-004T, so `wokwi/consumption-node` has two custom chips:
+
+- `chip-yf-s201` outputs 7.5 pulses per second for each L/min.
+- `chip-pzem-004t` answers the Modbus-RTU requests of the node like a PZEM-004T v3. Its energy counter grows with the active power (voltage × current × power factor), and the **Time acceleration (x)** control speeds it up for demos.
 
 1. Build the `consumption-node` environment.
 2. Open `wokwi/consumption-node/diagram.json` with the Wokwi plugin and start the simulator. If the plugin reports "Configuration file not found in project", pick `wokwi.toml` and `diagram.json` of that folder with the folder icon of the Wokwi panel.
 3. Click the YF-S201 chip and move the **Flow rate (L/min)** control. The serial monitor shows the flow, and when the control goes back to 0 the node reports the water of that use.
 
-For example, 10 L/min for 60 seconds reports `WATER` ≈ 0.010 m³.
+4. Click the PZEM-004T chip and set the **Voltage (V)**, **Load current (A)**, **Power factor** and **Time acceleration (x)** controls. The serial monitor shows each change of the energy counter, and the node reports every time the accumulated energy reaches 0.01 kWh.
+
+For example, 10 L/min for 60 seconds reports `WATER` ≈ 0.010 m³. With the default values of the PZEM-004T chip (220 V, 5 A, power factor 0.95, x1), the load draws 1045 W and the node reports `ELECTRICITY` = 0.010 kWh about every 35 seconds. With x60, one minute of simulation counts as one hour, about 1.045 kWh.
 
 The compiled chip (`yf-s201.chip.wasm`) is versioned, so it only has to be compiled again after changing `yf-s201.chip.c`. That needs [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) installed in `C:\wasi-sdk`:
 
@@ -264,7 +281,7 @@ The compiled chip (`yf-s201.chip.wasm`) is versioned, so it only has to be compi
 
 ### Consumption node behavior
 
-Design guidelines of the node, in development. The water part and the electricity part follow the same rules.
+Design guidelines of the node. The water part and the electricity part follow the same rules.
 
 - The node is built on the Modest IoT Nano Framework and is loop-less: it only acts when a sensor event arrives. The sensors are read locally, and nothing is sent while there is no consumption.
 - Each measurement is the consumption since the previous report, never the cumulative counter of the meter: `WATER` in m³ and `ELECTRICITY` in kWh. The Edge API and the REST API add up every value they receive.
@@ -274,7 +291,7 @@ Design guidelines of the node, in development. The water part and the electricit
 - If the Edge API cannot be reached, the consumption of the report is added to the next one and retried every 30 seconds. The framework `TelemetryBuffer` is not used: in v1.1.2 it never returns the stored packets.
 - The RGB LED is green when the node works, orange when the WiFi or the Edge API cannot be reached, and purple when a meter does not answer.
 - Water: the YF-S201 is read every second (about 450 pulses per liter) and its pulses are counted by interrupt. A use ends after 3 seconds without pulses, and then the node reports. While the water keeps running, it reports every 5 minutes so that a leak is detected in time.
-- Electricity: the node reports when the accumulated energy reaches 10 Wh (0.01 kWh).
+- Electricity: the PZEM-004T is read every second over Modbus-RTU without blocking: each reading sends the request and the next one parses the answer. The first answer only sets the reference of the energy counter (1 Wh resolution), and each reading adds the difference. The node reports when the accumulated energy reaches 10 Wh (0.01 kWh). If the meter does not answer 3 readings in a row, the RGB LED turns purple.
 - Heartbeat: if the node has not reported for 10 minutes, it sends both measurements with value 0. The REST API marks a device as disconnected after 15 minutes without reports.
-- Wokwi does not include the YF-S201 or the PZEM-004T, so the simulation uses custom chips (`chip-yf-s201`) with a control to change the reading, as the course BH1750 example does.
-- `WaterFlowSensor` of the framework is not used: it never counts the pulses and assumes 7 pulses per milliliter. The node defines its own water sensor class.
+- Wokwi does not include the YF-S201 or the PZEM-004T, so the simulation uses custom chips (`chip-yf-s201`, `chip-pzem-004t`) with controls to change the reading, as the course BH1750 example does.
+- `WaterFlowSensor` of the framework is not used: it never counts the pulses and assumes 7 pulses per milliliter. The node defines its own water sensor class.
