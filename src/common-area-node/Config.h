@@ -33,3 +33,5 @@ const char* const TIME_ZONE = "UTC0";
 const char* const NTP_SERVER = "pool.ntp.org";
 const time_t MINIMUM_VALID_UTC_TIME = 1700000000;
 const char* const FIRMWARE_VERSION = "SP-CMN FW 0.2.0";
+const unsigned long HEARTBEAT_INTERVAL_IN_MILLISECONDS = 600000;
+const unsigned long HEARTBEAT_CHECK_INTERVAL_IN_MILLISECONDS = 60000;

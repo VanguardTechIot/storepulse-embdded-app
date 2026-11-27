@@ -24,10 +24,13 @@
  *
  * Acts as the mediator between the PIR sensor, the status LED, the camera, the
  * microSD card and the Edge API: motion events coming from the sensor trigger an
- * image capture and a MOTION report.
+ * image capture and a MOTION report. A heartbeat keeps the node connected
+ * while there is no motion.
  */
 class CommonAreaNode : public Device {
 private:
+    static constexpr int HEARTBEAT_CHECK_EVENT_IDENTIFIER = 62;
+
     WiFiConnectivityDriver& wifiDriver;
     EdgeApiGatewayClient& edgeGateway;
     PassiveInfraredSensor motionSensor;
@@ -35,6 +38,8 @@ private:
     CameraDriver camera;
     ExternalStorageDriver storage;
     unsigned int nextCaptureIndex = 1;
+    bool motionPresent = false;
+    unsigned long lastReportAtInMilliseconds = 0;
 
     mutable std::deque<CommonAreaTelemetryPackage> undeliveredReports;
     mutable unsigned long lastDeliveryAttemptAtInMilliseconds = 0;
@@ -97,6 +102,8 @@ private:
      * @param motionDetected true when motion starts, false when it stops.
      */
     void reportMotion(const bool motionDetected) {
+        motionPresent = motionDetected;
+        lastReportAtInMilliseconds = millis();
         auto report = std::make_unique<CommonAreaTelemetryPackage>(DEVICE_ID, currentUtcTime(), motionDetected);
         if (!enqueueTelemetryPayload(std::move(report))) {
             Serial.println(F("[CommonAreaNode] Motion report lost, telemetry queue unavailable"));
@@ -154,15 +161,21 @@ public:
             Serial.println(F("[CommonAreaNode] Motion sensor registration failed"));
         }
 
+        if (!appendSensorToScheduler(this, HEARTBEAT_CHECK_EVENT_IDENTIFIER, HEARTBEAT_CHECK_INTERVAL_IN_MILLISECONDS)) {
+            Serial.println(F("[CommonAreaNode] Heartbeat registration failed"));
+        }
+
         EngineConfiguration engineConfiguration;
         engineConfiguration.samplerStackBytes = SAMPLER_STACK_BYTES;
         engineConfiguration.networkStackBytes = NETWORK_STACK_BYTES;
         engineConfiguration.queueLength = ASYNC_ENGINE_QUEUE_DEPTH;
         initializeAsynchronousEngine(engineConfiguration);
+
+        reportMotion(false);
     }
 
     /**
-     * @brief Reacts to the motion events of the PIR sensor.
+     * @brief Reacts to the motion events of the PIR sensor and to the heartbeat check.
      * @param event Event emitted by a sensor of this node.
      */
     void on(Event event) override {
@@ -177,6 +190,12 @@ public:
                 Serial.println(F("[CommonAreaNode] Motion stopped"));
                 statusLed.handle(Led::TURN_OFF_COMMAND);
                 reportMotion(false);
+                break;
+            case HEARTBEAT_CHECK_EVENT_IDENTIFIER:
+                if (millis() - lastReportAtInMilliseconds >= HEARTBEAT_INTERVAL_IN_MILLISECONDS) {
+                    Serial.println(F("[CommonAreaNode] Heartbeat"));
+                    reportMotion(motionPresent);
+                }
                 break;
             default:
                 break;
