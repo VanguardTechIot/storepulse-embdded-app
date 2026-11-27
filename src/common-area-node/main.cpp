@@ -3,29 +3,46 @@
  * @brief StorePulse common area node built with the Modest IoT Nano Framework.
  *
  * The node watches a common area of the gallery with a PIR sensor. When motion
- * is detected it turns on the flash, captures an image and stores it on the
- * microSD card.
+ * is detected it turns on the flash, captures an image, stores it on the microSD
+ * card and reports the motion to the Edge API.
  */
 
 #include <Arduino.h>
 #include <ModestIoT.h>
+#include <deque>
+#include <memory>
+#include <time.h>
 #include "Config.h"
+#include "Secrets.h"
 #include "CameraDriver.h"
 #include "ExternalStorageDriver.h"
+#include "EdgeApiGatewayClient.h"
+#include "CommonAreaTelemetryPackage.h"
 
 /**
  * @brief Common area node of a StorePulse gallery.
  *
- * Acts as the mediator between the PIR sensor, the status LED, the camera and the
- * microSD card: motion events coming from the sensor trigger an image capture.
+ * Acts as the mediator between the PIR sensor, the status LED, the camera, the
+ * microSD card and the Edge API: motion events coming from the sensor trigger an
+ * image capture and a MOTION report.
  */
 class CommonAreaNode : public Device {
 private:
+    WiFiConnectivityDriver& wifiDriver;
+    EdgeApiGatewayClient& edgeGateway;
     PassiveInfraredSensor motionSensor;
     Led statusLed;
     CameraDriver camera;
     ExternalStorageDriver storage;
     unsigned int nextCaptureIndex = 1;
+
+    mutable std::deque<CommonAreaTelemetryPackage> undeliveredReports;
+    mutable unsigned long lastDeliveryAttemptAtInMilliseconds = 0;
+
+    static time_t currentUtcTime() {
+        const time_t now = time(nullptr);
+        return now >= MINIMUM_VALID_UTC_TIME ? now : 0;
+    }
 
     void initializePeripherals() {
         camera.initialize();
@@ -75,12 +92,60 @@ private:
         camera.releaseJpeg(jpegBuffer);
     }
 
+    /**
+     * @brief Queues a MOTION report for the Edge API.
+     * @param motionDetected true when motion starts, false when it stops.
+     */
+    void reportMotion(const bool motionDetected) {
+        auto report = std::make_unique<CommonAreaTelemetryPackage>(DEVICE_ID, currentUtcTime(), motionDetected);
+        if (!enqueueTelemetryPayload(std::move(report))) {
+            Serial.println(F("[CommonAreaNode] Motion report lost, telemetry queue unavailable"));
+        }
+    }
+
+    bool deliver(CommonAreaTelemetryPackage& report) const {
+        lastDeliveryAttemptAtInMilliseconds = millis();
+
+        if (edgeGateway.sendTelemetryRecord(report)) {
+            return true;
+        }
+        if (edgeGateway.wasLastPayloadRejected()) {
+            Serial.println(F("[CommonAreaNode] The Edge API rejected the report content; report dropped"));
+            return true;
+        }
+        if (edgeGateway.getLastResponseStatusCode() == 401) {
+            edgeGateway.authenticate();
+        }
+        return false;
+    }
+
+    void deliverUndeliveredReports() const {
+        while (!undeliveredReports.empty()) {
+            if (!deliver(undeliveredReports.front())) {
+                return;
+            }
+            undeliveredReports.pop_front();
+        }
+    }
+
+    void keepUndelivered(const CommonAreaTelemetryPackage& report) const {
+        if (undeliveredReports.size() >= MAXIMUM_UNDELIVERED_REPORTS) {
+            undeliveredReports.pop_front();
+        }
+        undeliveredReports.push_back(report);
+        Serial.printf("[CommonAreaNode] Report not delivered (%d); %u kept to retry\n",
+                      edgeGateway.getLastResponseStatusCode(), static_cast<unsigned>(undeliveredReports.size()));
+    }
+
 public:
-    CommonAreaNode()
+    CommonAreaNode(WiFiConnectivityDriver& wifiDriver, EdgeApiGatewayClient& edgeGateway)
         : Device(SAMPLING_INTERVAL_IN_MILLISECONDS, HARDWARE_TIMER_INDEX),
+          wifiDriver(wifiDriver),
+          edgeGateway(edgeGateway),
           motionSensor(MOTION_SENSOR_PIN, this),
           statusLed(STATUS_LED_PIN, STATUS_LED_INITIAL_STATE, this)
     {
+        setTelemetryGateway(&edgeGateway);
         initializePeripherals();
 
         uint32_t motionTriggerHandle = appendSensorToTriggeringScheduler(
@@ -91,6 +156,7 @@ public:
 
         EngineConfiguration engineConfiguration;
         engineConfiguration.samplerStackBytes = SAMPLER_STACK_BYTES;
+        engineConfiguration.networkStackBytes = NETWORK_STACK_BYTES;
         engineConfiguration.queueLength = ASYNC_ENGINE_QUEUE_DEPTH;
         initializeAsynchronousEngine(engineConfiguration);
     }
@@ -105,23 +171,65 @@ public:
                 Serial.println(F("[CommonAreaNode] Motion detected"));
                 statusLed.handle(Led::TURN_ON_COMMAND);
                 captureAndStoreImage();
+                reportMotion(true);
                 break;
             case PassiveInfraredSensor::MOTION_STOPPED_EVENT_IDENTIFIER:
                 Serial.println(F("[CommonAreaNode] Motion stopped"));
                 statusLed.handle(Led::TURN_OFF_COMMAND);
+                reportMotion(false);
                 break;
             default:
                 break;
         }
     }
+
+protected:
+    void processQueuedTelemetryData(const TelemetryPackage* rawQueueItemPayload) const override {
+        CommonAreaTelemetryPackage report(*static_cast<const CommonAreaTelemetryPackage*>(rawQueueItemPayload));
+
+        deliverUndeliveredReports();
+        report.setBufferedEvents(static_cast<int>(undeliveredReports.size()));
+        if (!undeliveredReports.empty() || !deliver(report)) {
+            keepUndelivered(report);
+        }
+    }
+
+    void maintainNetworkServices() const override {
+        if (!wifiDriver.isConnected()) {
+            wifiDriver.connect();
+            return;
+        }
+        if (!undeliveredReports.empty() &&
+            millis() - lastDeliveryAttemptAtInMilliseconds >= REPORT_RETRY_INTERVAL_IN_MILLISECONDS) {
+            deliverUndeliveredReports();
+        }
+    }
 };
 
+static WiFiConnectivityDriver* wifiDriver = nullptr;
+static EdgeApiGatewayClient* edgeGateway = nullptr;
 static CommonAreaNode* commonAreaNode = nullptr;
 
 void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
     Serial.println(F("[CommonAreaNode] Starting"));
-    commonAreaNode = new CommonAreaNode();
+    Device::setFirmwareVersion(FIRMWARE_VERSION);
+
+    wifiDriver = new WiFiConnectivityDriver(WIFI_SSID, WIFI_PASSWORD);
+    if (wifiDriver->waitForConnection(WIFI_CONNECTION_TIMEOUT_IN_MILLISECONDS)) {
+        Serial.printf("[CommonAreaNode] WiFi connected, IP %s\n", wifiDriver->getLocalIpAddress().toString().c_str());
+    } else {
+        Serial.println(F("[CommonAreaNode] WiFi not connected yet; it keeps retrying in the background"));
+    }
+    TimeSynchronizationDriver::initialize(TIME_ZONE, NTP_SERVER);
+
+    edgeGateway = new EdgeApiGatewayClient(*wifiDriver, EDGE_BASE_URL, DEVICE_ID, API_KEY,
+                                           EDGE_REQUEST_TIMEOUT_IN_MILLISECONDS);
+    if (!edgeGateway->authenticate()) {
+        Serial.println(F("[CommonAreaNode] The Edge API did not accept the node: check DEVICE_ID, API_KEY and EDGE_BASE_URL"));
+    }
+
+    commonAreaNode = new CommonAreaNode(*wifiDriver, *edgeGateway);
     Serial.println(F("[CommonAreaNode] Ready"));
 }
 
